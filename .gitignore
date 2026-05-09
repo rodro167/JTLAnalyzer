@@ -1,0 +1,30 @@
+# Entorno virtual
+.venv/
+venv/
+
+# Variables de entorno con secretos
+.env
+
+# Cache y bytecode de Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# JTLs grandes y outputs generados
+samples/*
+!samples/.gitkeep
+*.xlsx
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
