@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 
 import anthropic
 
@@ -10,13 +11,42 @@ from jtl_analyzer.providers.base import LLMProvider, LLMResponse, Message
 
 logger = logging.getLogger(__name__)
 
+# Matches an optional ```json or ``` opening fence, captures content, closing fence.
+_CODE_FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```")
+
+# TODO: Migrate to native structured-output APIs (Anthropic tool use,
+# OpenAI response_format, Gemini response_mime_type) once the LLMProvider
+# abstraction is extended to carry a provider-agnostic schema descriptor.
+# That eliminates this class of bug at the source instead of patching
+# responses after the fact. Target: Milestone 1+.
+
+
+def _strip_code_fences(text: str) -> str:
+    """Return *text* with any surrounding Markdown code fence removed.
+
+    Handles the following cases produced by LLMs when asked for JSON:
+
+    * ````` ```json\\n{...}\\n``` ````` — fence with language tag
+    * ````` ```\\n{...}\\n``` ````` — fence without language tag
+    * ``{...}`` — already plain JSON, returned unchanged
+    * Any amount of whitespace before/after the fence or the JSON itself
+
+    If no fence is found the input is returned stripped of leading/trailing
+    whitespace. If a fence is found but the inner content is empty, an empty
+    string is returned (the caller's JSON parser will raise from there).
+    """
+    match = _CODE_FENCE_RE.search(text.strip())
+    if match:
+        return match.group(1).strip()
+    return text.strip()
+
 
 class AnthropicProvider(LLMProvider):
     """LLM provider backed by the Anthropic Claude API.
 
     Args:
         api_key: Anthropic API key.
-        model: Model identifier (e.g. ``"claude-opus-4-5"``).
+        model: Model identifier (e.g. ``"claude-sonnet-4-6"``).
     """
 
     def __init__(self, api_key: str, model: str) -> None:
@@ -39,7 +69,8 @@ class AnthropicProvider(LLMProvider):
             max_tokens: Upper bound on generated tokens.
             temperature: Sampling temperature; 0.0 for deterministic output.
             json_mode: When True, appends an instruction to return valid JSON
-                only and validates that the response parses as JSON.
+                only, strips any Markdown code fences from the response, and
+                validates that the result parses as JSON.
 
         Returns:
             The model response wrapped in an ``LLMResponse``.
@@ -81,6 +112,7 @@ class AnthropicProvider(LLMProvider):
         content = response.content[0].text
 
         if json_mode:
+            content = _strip_code_fences(content)
             try:
                 json.loads(content)
             except json.JSONDecodeError as exc:

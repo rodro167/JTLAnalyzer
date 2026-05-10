@@ -52,7 +52,7 @@ def load_config() -> Config:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
     provider = os.getenv("LLM_PROVIDER", "anthropic").lower()
-    model = os.getenv("LLM_MODEL", "claude-opus-4-5")
+    model = os.getenv("LLM_MODEL", "claude-sonnet-4-6")
     language = os.getenv("OUTPUT_LANGUAGE", "en")
 
     key_env_var = _PROVIDER_KEY_ENV.get(provider)
