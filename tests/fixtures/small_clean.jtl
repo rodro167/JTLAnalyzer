@@ -1,0 +1,7 @@
+timeStamp,elapsed,label,responseCode,success
+1700000000000,100,Homepage,200,true
+1700000001000,200,Homepage,200,true
+1700000002000,300,Homepage,200,true
+1700000003000,100,Homepage,200,true
+1700000004000,200,Homepage,200,true
+1700000005000,300,Homepage,200,true

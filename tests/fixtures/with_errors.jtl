@@ -1,0 +1,7 @@
+timeStamp,elapsed,label,responseCode,success
+1700000000000,100,Login,200,true
+1700000001000,200,Login,200,true
+1700000002000,300,Login,200,true
+1700000003000,150,Login,200,true
+1700000004000,250,Login,500,false
+1700000005000,350,Login,500,false

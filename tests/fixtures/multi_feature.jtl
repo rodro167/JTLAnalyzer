@@ -1,0 +1,7 @@
+timeStamp,elapsed,label,responseCode,success
+1700000000000,50,Search,200,true
+1700000001000,60,Search,200,true
+1700000002000,70,Search,200,true
+1700000003000,500,Checkout,200,true
+1700000004000,600,Checkout,200,true
+1700000005000,700,Checkout,500,false

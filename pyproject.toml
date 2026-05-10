@@ -9,6 +9,7 @@ description = "Multi-agent system for JMeter test result analysis"
 requires-python = ">=3.13"
 dependencies = [
     "pandas>=2.2",
+    "pydantic>=2.0",
     "python-dotenv>=1.0",
     "anthropic>=0.40",
 ]
