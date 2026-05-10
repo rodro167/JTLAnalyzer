@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jtl-analyzer"
 version = "0.1.0"
-description = "Sistema multiagente para análisis de resultados de pruebas JMeter"
+description = "Multi-agent system for JMeter test result analysis"
 requires-python = ">=3.13"
 dependencies = [
     "pandas>=2.2",

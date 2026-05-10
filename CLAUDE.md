@@ -1,48 +1,49 @@
 # JTL Analyzer
 
-Sistema multiagente para analizar resultados de pruebas JMeter (archivos .jtl) y
-generar reportes en Excel. Soporta análisis individual de un JTL y comparación
-entre múltiples JTLs (en hitos futuros).
+A multi-agent system that analyzes JMeter test results (.jtl files) and
+generates Excel reports. Supports analysis of individual test runs and
+comparison across multiple runs (in future milestones).
 
-## Estado actual: Hito 0
+## Current state: Milestone 0
 
-Núcleo mínimo funcional. Sólo el orquestador, el cargador y el estadístico
-básico están implementados. El sistema acepta un único JTL en formato CSV y
-produce métricas básicas (count, average, error rate) globales y por feature.
+Minimal working core. Only the orchestrator, the loader, and a basic
+statistician are implemented. The system accepts a single CSV-format JTL
+file and produces basic metrics (count, average, error rate) globally and
+per feature.
 
-## Arquitectura
+## Architecture
 
-Sistema de agentes especializados coordinados por un agente planificador. Regla
-fundamental:
+A system of specialized agents coordinated by a planner agent. Core rule:
 
-- Los **agentes especialistas** (cargador, estadístico; en hitos futuros:
-  tendencias, anomalías, errores, comparativo, visualizador, reportería) son
-  **código Python determinístico**. No invocan LLMs. Producen dataclasses con
-  números, listas y referencias temporales — nunca prosa.
-- Sólo **dos roles usan LLM**: el orquestador (decide qué pasos ejecutar) y, en
-  hitos futuros, el narrador (convierte hallazgos en prosa interpretativa).
-- Toda interacción con LLMs pasa por la abstracción `LLMProvider`
-  (`src/jtl_analyzer/providers/`). **No usar SDKs de proveedores directamente
-  desde otros módulos.**
+- **Specialist agents** (loader, statistician; in future milestones: trends,
+  anomalies, errors, comparator, visualizer, reporter) are **deterministic
+  Python code**. They do not invoke LLMs. They produce dataclasses with
+  numbers, lists, and temporal references — never prose.
+- Only **two roles use LLMs**: the orchestrator (decides which steps to
+  execute) and, in future milestones, the narrator (turns findings into
+  interpretive prose).
+- All LLM interaction goes through the `LLMProvider` abstraction
+  (`src/jtl_analyzer/providers/`). **Do not call provider SDKs directly
+  from other modules.**
 
-### Flujo del orquestador
+### Orchestrator flow
 
-1. Recibe el pedido del usuario más metadata (paths a JTLs, opciones).
-2. Genera un `Plan` — lista de `PlanStep` con dependencias — invocando al LLM
-   en modo JSON estructurado.
-3. Valida el plan: cada step referencia un agente registrado, y las
-   dependencias forman un DAG sin ciclos.
-4. Ejecuta los steps en orden topológico, pasando los outputs de pasos previos
-   como inputs según las dependencias declaradas.
-5. Retorna el resultado final estructurado.
+1. Receives the user's request along with metadata (paths to JTLs, options).
+2. Generates a `Plan` — a list of `PlanStep` with dependencies — by invoking
+   the LLM in structured JSON mode.
+3. Validates the plan: each step must reference a registered agent, and
+   dependencies must form an acyclic graph.
+4. Executes steps in topological order, passing outputs from previous steps
+   as inputs according to declared dependencies.
+5. Returns the final structured result.
 
-En Hito 0 hay un único intent soportado ("analizar un JTL"), que produce un
-plan canónico de dos pasos: `loader` → `statistician`. La arquitectura está
-preparada para más intents sin cambios estructurales.
+In Milestone 0, only one intent is supported ("analyze a JTL"), which
+produces a canonical two-step plan: `loader` → `statistician`. The
+architecture is ready for additional intents without structural changes.
 
-### Abstracción de proveedor LLM
+### LLM provider abstraction
 
-Todos los proveedores implementan `LLMProvider` (en `providers/base.py`):
+All providers implement `LLMProvider` (in `providers/base.py`):
 
 ```python
 class LLMProvider(ABC):
@@ -57,97 +58,117 @@ class LLMProvider(ABC):
     ) -> LLMResponse: ...
 ```
 
-Para `json_mode=True`, la implementación más portable entre proveedores en
-Hito 0 es prompt engineering: instruir al modelo a responder sólo con JSON
-válido y parsear la respuesta. Los proveedores tienen APIs nativas para
-salida estructurada (Anthropic con tool use, OpenAI con `response_format`,
-Gemini con `response_mime_type`) que pueden incorporarse en hitos posteriores
-si el prompt engineering muestra inestabilidad.
+For `json_mode=True`, the most portable implementation across providers in
+Milestone 0 is prompt engineering: instruct the model to respond with valid
+JSON only and parse the response. Providers offer native APIs for structured
+output (Anthropic via tool use, OpenAI via `response_format`, Gemini via
+`response_mime_type`) that can be incorporated in later milestones if prompt
+engineering proves unstable.
+
+### Internationalization (i18n)
+
+The system is designed to support multiple output languages without code
+changes outside dedicated modules.
+
+- **Code, identifiers, comments, docstrings, and logs**: always in English.
+- **User-facing output** (CLI messages, Excel report labels, narrator prose):
+  driven by an `output_language` setting (default: `"en"`).
+- Static UI strings live in `src/jtl_analyzer/i18n/` as per-language
+  modules (`en.py`, `es.py`, ...). Modules outside `i18n/` import message
+  keys, never hardcoded user-facing strings.
+- The narrator agent (future milestone) receives `output_language` as a
+  parameter and instructs the LLM to respond in that language.
+
+In Milestone 0 only English is implemented. Spanish and others will be added
+when there is enough output surface to justify it.
 
 ## Stack
 
 - Python 3.13+
-- pandas (manipulación de datos)
-- pytest (tests)
-- python-dotenv (carga de `.env`)
-- SDKs oficiales de los proveedores LLM (`anthropic`; `openai` y
-  `google-generativeai` en hitos futuros)
-- pip + venv (gestión de entorno)
+- pandas (data manipulation)
+- pytest (testing)
+- python-dotenv (loads `.env`)
+- Official LLM provider SDKs (`anthropic` in Milestone 0; `openai` and
+  `google-generativeai` in future milestones)
+- pip + venv (environment management)
 
-## Convenciones
+## Conventions
 
-- **Naming**: módulos y archivos en `snake_case`, clases en `PascalCase`,
-  funciones y variables en `snake_case`.
-- **Type hints**: obligatorios en todas las funciones públicas y métodos de
-  clases. Usar sintaxis moderna (`list[str]` en vez de `List[str]`,
-  `X | None` en vez de `Optional[X]`).
-- **Modelos de datos**: usar `@dataclass(frozen=True)` para los reports y
-  modelos inmutables. Reservar pydantic para casos donde haga falta validación
-  desde JSON externo (parsing del plan que devuelve el LLM, por ejemplo).
-- **Errores**: definir excepciones específicas en `core/exceptions.py`
-  (`InvalidJTLError`, `PlanValidationError`, `ProviderError`, etc.). No
-  retornar `None` o `False` para señalar fallas.
-- **Logging**: usar el módulo `logging` estándar, configurado en `config.py`.
-  No usar `print()` excepto en `cli.py`.
-- **Docstrings**: estilo Google, obligatorias en clases públicas y en el API
-  público de cada módulo.
+- **Naming**: modules and files in `snake_case`, classes in `PascalCase`,
+  functions and variables in `snake_case`.
+- **Type hints**: required on every public function and class method. Use
+  modern syntax (`list[str]` instead of `List[str]`, `X | None` instead of
+  `Optional[X]`).
+- **Data models**: use `@dataclass(frozen=True)` for reports and immutable
+  models. Reserve pydantic for cases that need validation from external JSON
+  (parsing the plan returned by the LLM, for example).
+- **Errors**: define domain-specific exceptions in `core/exceptions.py`
+  (`InvalidJTLError`, `PlanValidationError`, `ProviderError`, ...). Do not
+  return `None` or `False` to signal failure.
+- **Logging**: use the standard `logging` module, configured in `config.py`.
+  Do not use `print()` except in `cli.py`.
+- **Docstrings**: Google style, required on public classes and on the
+  public API of each module.
 
-## Comandos
+## Commands
 
 ```bash
-# Setup inicial
+# Initial setup
 python -m venv .venv
-source .venv/bin/activate          # Linux/macOS
-# .venv\Scripts\activate           # Windows
+.venv\Scripts\activate              # Windows
+# source .venv/bin/activate         # Linux/macOS
 pip install -e ".[dev]"
 
-# Configuración
+# Configuration
 cp .env.example .env
-# Editar .env y poner las API keys
+# Edit .env and set your API keys
 
-# Correr todos los tests
+# Run all tests
 pytest
 
-# Correr un test específico
+# Run a specific test file
 pytest tests/test_loader.py -v
 
-# Correr el CLI sobre un JTL de prueba
+# Run the CLI against a sample JTL
 python -m jtl_analyzer.cli analyze tests/fixtures/small_clean.jtl
 ```
 
-## Variables de entorno
+## Environment variables
 
-Definidas en `.env` (no commitear). Ver `.env.example` para la plantilla.
+Defined in `.env` (never commit it). See `.env.example` for the template.
 
 - `LLM_PROVIDER`: `"anthropic"` | `"openai"` | `"gemini"` (default: `"anthropic"`)
-- `LLM_MODEL`: identificador del modelo
-- `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`: según el proveedor
-  configurado
+- `LLM_MODEL`: model identifier
+- `OUTPUT_LANGUAGE`: ISO 639-1 code, e.g. `"en"`, `"es"` (default: `"en"`)
+- `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`: as required by
+  the configured provider
 
-## Reglas importantes al contribuir
+## Important contribution rules
 
-1. **Nunca** llamar al SDK de un proveedor LLM directamente fuera de
-   `providers/`. Siempre pasar por `LLMProvider`.
-2. **Nunca** invocar un LLM desde un agente especialista. Si una funcionalidad
-   parece necesitar "interpretación", el especialista produce el dato
-   estructurado y un agente con LLM (orquestador o futuro narrador) lo
-   interpreta.
-3. **Todo agente nuevo** debe (a) registrarse en el orquestador con un nombre
-   único, (b) consumir y producir dataclasses definidas en `core/models.py`,
-   y (c) tener tests unitarios.
-4. **Tests primero** para los especialistas: son código puro, son
-   trivialmente testeables. Los tests del orquestador deben mockear
-   `LLMProvider` para no depender de llamadas externas.
-5. **No commitear** archivos JTL grandes (`samples/` está en `.gitignore`),
-   `.env`, `.venv/`, ni outputs generados (Excel finales).
+1. **Never** call a provider SDK directly outside `providers/`. Always go
+   through `LLMProvider`.
+2. **Never** invoke an LLM from a specialist agent. If a feature seems to
+   need "interpretation", the specialist produces structured data and an
+   LLM-using agent (orchestrator or, in the future, narrator) interprets it.
+3. **Every new agent** must (a) register with the orchestrator under a
+   unique name, (b) consume and produce dataclasses defined in
+   `core/models.py`, and (c) have unit tests.
+4. **Test specialists first**: they are pure code, trivially testable.
+   Orchestrator tests must mock `LLMProvider` to avoid external calls.
+5. **Never commit** large JTL files (`samples/` is gitignored), `.env`,
+   `.venv/`, or generated outputs (final Excel files).
+6. **No hardcoded user-facing strings** outside `i18n/`. CLI messages,
+   exception messages shown to users, and report labels go through the
+   message catalog.
 
-## Próximos hitos
+## Roadmap
 
-- **Hito 1**: implementación de `OpenAIProvider` y `GeminiProvider`. Agentes
-  de tendencias, anomalías y errores. Ampliación del estadístico (percentiles,
-  throughput).
-- **Hito 2**: agente comparativo (multi-JTL) con tests de significancia.
-- **Hito 3**: visualizador y reportería con template Excel embebido como
-  recurso del paquete.
-- **Hito 4**: agente narrador. Interfaz Streamlit para modo conversacional /
-  granular.
+- **Milestone 1**: implement `OpenAIProvider` and `GeminiProvider`. Add
+  trends, anomalies, and errors agents. Extend the statistician
+  (percentiles, throughput).
+- **Milestone 2**: comparator agent (multi-JTL) with statistical
+  significance tests.
+- **Milestone 3**: visualizer and reporter with the Excel template embedded
+  as a package resource.
+- **Milestone 4**: narrator agent. Streamlit interface for conversational /
+  granular mode. Spanish translation of the i18n catalog.
