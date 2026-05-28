@@ -92,3 +92,85 @@ class TestLoadErrors:
         empty.write_text("")
         with pytest.raises(InvalidJTLError):
             loader.run(str(empty))
+
+
+class TestFormatDetection:
+    def test_detects_xml_for_xml_fixture(self):
+        assert loader._detect_format(str(FIXTURES / "small_clean_xml.jtl")) == "xml"
+
+    def test_detects_csv_for_csv_fixture(self):
+        assert loader._detect_format(str(FIXTURES / "small_clean.jtl")) == "csv"
+
+
+class TestLoadXMLFiles:
+    def test_small_clean_xml_returns_normalized_dataset(self):
+        ds = loader.run(str(FIXTURES / "small_clean_xml.jtl"))
+        assert isinstance(ds, NormalizedDataset)
+
+    def test_small_clean_xml_row_count(self):
+        ds = loader.run(str(FIXTURES / "small_clean_xml.jtl"))
+        assert ds.metadata.row_count == 6
+
+    def test_small_clean_xml_required_columns_present(self):
+        ds = loader.run(str(FIXTURES / "small_clean_xml.jtl"))
+        assert {"timestamp", "elapsed", "label", "success"}.issubset(ds.data.columns)
+
+    def test_small_clean_xml_elapsed_is_float(self):
+        ds = loader.run(str(FIXTURES / "small_clean_xml.jtl"))
+        assert ds.data["elapsed"].dtype == float
+
+    def test_small_clean_xml_success_is_bool(self):
+        ds = loader.run(str(FIXTURES / "small_clean_xml.jtl"))
+        assert ds.data["success"].dtype == bool
+
+    def test_small_clean_xml_one_failure(self):
+        ds = loader.run(str(FIXTURES / "small_clean_xml.jtl"))
+        assert (~ds.data["success"]).sum() == 1
+
+    def test_mixed_xml_elements_row_count(self):
+        ds = loader.run(str(FIXTURES / "mixed_xml_elements.jtl"))
+        assert ds.metadata.row_count == 6
+
+    def test_mixed_xml_elements_labels(self):
+        ds = loader.run(str(FIXTURES / "mixed_xml_elements.jtl"))
+        assert set(ds.data["label"].unique()) == {"Search", "API"}
+
+
+class TestXMLErrors:
+    def test_malformed_xml_raises_invalid_jtl_error(self, tmp_path):
+        bad = tmp_path / "bad.jtl"
+        bad.write_text('<?xml version="1.0"?>\n<testResults><broken>')
+        with pytest.raises(InvalidJTLError):
+            loader.run(str(bad))
+
+
+class TestXMLTruncation:
+    def test_truncated_xml_returns_partial_dataset(self):
+        ds = loader.run(str(FIXTURES / "truncated_xml.jtl"))
+        assert isinstance(ds, NormalizedDataset)
+        assert ds.metadata.row_count == 4
+
+    def test_zero_samples_malformed_xml_still_raises(self, tmp_path):
+        bad = tmp_path / "garbage.jtl"
+        bad.write_text('<?xml version="1.0"?>\n<garbage')
+        with pytest.raises(InvalidJTLError):
+            loader.run(str(bad))
+
+    def test_truncated_xml_logs_warning(self, caplog):
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="jtl_analyzer.agents.loader"):
+            loader.run(str(FIXTURES / "truncated_xml.jtl"))
+        assert any("truncated" in r.message.lower() for r in caplog.records)
+
+
+_LARGE_XML_FIXTURE = FIXTURES / "large_xml_real.jtl"
+
+
+@pytest.mark.skipif(
+    not _LARGE_XML_FIXTURE.exists(),
+    reason="large_xml_real.jtl not present in fixtures",
+)
+def test_large_xml_real_loads_successfully():
+    ds = loader.run(str(_LARGE_XML_FIXTURE))
+    assert len(ds.data) > 1000

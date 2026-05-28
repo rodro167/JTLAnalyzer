@@ -15,6 +15,10 @@ ERROR_MISSING_API_KEY = (
     "Add {var_name} to your .env file."
 )
 
+ERROR_MALFORMED_XML = "Could not parse XML in '{file_path}': {reason}"
+ERROR_EMPTY_DATASET = "No sample elements found in '{file_path}'"
+WARNING_TRUNCATED_FILE = "File appears truncated; recovered {count} samples from '{file_path}'"
+
 # Report labels
 REPORT_HEADER = "=== JTL Analysis Report ==="
 REPORT_FILE = "File        : {file_path}"

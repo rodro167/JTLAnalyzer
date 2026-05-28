@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testResults version="1.2">
+  <httpSample t="245" ts="1700000000000" s="true" lb="Login" rc="200" rm="OK" tn="Thread Group 1-1" dt="text" by="1234" ng="1" na="1" hn="localhost"/>
+  <httpSample t="312" ts="1700000001000" s="true" lb="Dashboard" rc="200" rm="OK" tn="Thread Group 1-1" dt="text" by="5678" ng="1" na="1" hn="localhost"/>
+  <httpSample t="189" ts="1700000002000" s="true" lb="Login" rc="200" rm="OK" tn="Thread Group 1-1" dt="text" by="1234" ng="1" na="1" hn="localhost"/>
+  <httpSample t="500" ts="1700000003000" s="false" lb="Dashboard" rc="500" rm="Internal Server Error" tn="Thread Group 1-1" dt="text" by="0" ng="1" na="1" hn="localhost"/>
+  <httpSample t="220" ts="1700000004000" s="true" lb="Login" rc="200" rm="OK" tn="Thread Group 1-1" dt="text" by="1234" ng="1" na="1" hn="localhost"/>
+  <httpSample t="275" ts="1700000005000" s="true" lb="Dashboard" rc="200" rm="OK" tn="Thread Group 1-1" dt="text" by="5678" ng="1" na="1" hn="localhost"/>
+</testResults>
