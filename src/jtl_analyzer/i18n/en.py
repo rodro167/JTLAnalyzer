@@ -25,11 +25,18 @@ REPORT_FILE = "File        : {file_path}"
 REPORT_DURATION = "Duration    : {duration:.1f}s"
 REPORT_TOTAL_SAMPLES = "Samples     : {count}"
 REPORT_GLOBAL_MEAN = "Mean        : {mean:.1f} ms"
-REPORT_GLOBAL_MIN = "Min         : {min:.1f} ms"
+REPORT_GLOBAL_P90 = "p90         : {p90:.1f} ms"
+REPORT_GLOBAL_P95 = "p95         : {p95:.1f} ms"
 REPORT_GLOBAL_MAX = "Max         : {max:.1f} ms"
+REPORT_GLOBAL_THROUGHPUT = "Throughput  : {throughput:.1f} req/s"
 REPORT_GLOBAL_ERROR_RATE = "Error rate  : {rate:.1%}"
 REPORT_FEATURES_HEADER = "\n--- Per-feature breakdown ---"
+REPORT_FEATURES_TABLE_HEADER = (
+    "  {:<30}  {:>5}  {:>8}  {:>8}  {:>8}  {:>8}  {:>9}  {:>7}".format(
+        "Feature", "Count", "Mean", "p90", "p95", "Max", "Tput(r/s)", "Errors"
+    )
+)
 REPORT_FEATURE_ROW = (
-    "  {name:<30} count={count:>5}  mean={mean:>7.1f}ms"
-    "  min={min:>7.1f}ms  max={max:>7.1f}ms  errors={rate:.1%}"
+    "  {name:<30}  {count:>5}  {mean:>7.1f}ms  {p90:>7.1f}ms"
+    "  {p95:>7.1f}ms  {max:>7.1f}ms  {throughput:>9.1f}  {rate:>6.1%}"
 )

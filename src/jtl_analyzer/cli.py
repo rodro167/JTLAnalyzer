@@ -16,10 +16,13 @@ def _print_report(report: StatsReport, lang: str) -> None:
     print(get_message("REPORT_DURATION", lang, duration=report.dataset_metadata.duration_seconds))
     print(get_message("REPORT_TOTAL_SAMPLES", lang, count=report.total_count))
     print(get_message("REPORT_GLOBAL_MEAN", lang, mean=report.global_mean_ms))
-    print(get_message("REPORT_GLOBAL_MIN", lang, min=report.global_min_ms))
+    print(get_message("REPORT_GLOBAL_P90", lang, p90=report.global_p90_ms))
+    print(get_message("REPORT_GLOBAL_P95", lang, p95=report.global_p95_ms))
     print(get_message("REPORT_GLOBAL_MAX", lang, max=report.global_max_ms))
+    print(get_message("REPORT_GLOBAL_THROUGHPUT", lang, throughput=report.global_throughput))
     print(get_message("REPORT_GLOBAL_ERROR_RATE", lang, rate=report.global_error_rate))
     print(get_message("REPORT_FEATURES_HEADER", lang))
+    print(get_message("REPORT_FEATURES_TABLE_HEADER", lang))
     for fs in report.per_feature:
         print(
             get_message(
@@ -28,8 +31,10 @@ def _print_report(report: StatsReport, lang: str) -> None:
                 name=fs.name,
                 count=fs.count,
                 mean=fs.mean_ms,
-                min=fs.min_ms,
+                p90=fs.p90_ms,
+                p95=fs.p95_ms,
                 max=fs.max_ms,
+                throughput=fs.throughput,
                 rate=fs.error_rate,
             )
         )

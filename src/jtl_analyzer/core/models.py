@@ -53,16 +53,30 @@ class FeatureStats:
         name: The ``label`` value from the JTL file identifying this feature.
         count: Number of samples.
         mean_ms: Mean elapsed time in milliseconds.
-        min_ms: Minimum elapsed time in milliseconds.
+        p50_ms: Median (50th percentile) elapsed time in milliseconds.
+        p90_ms: 90th percentile elapsed time in milliseconds.
+        p95_ms: 95th percentile elapsed time in milliseconds.
+        p99_ms: 99th percentile elapsed time in milliseconds.
+        std_ms: Standard deviation of elapsed time in milliseconds (ddof=1).
+            Set to 0.0 when count is 1 (std of a single value is undefined).
         max_ms: Maximum elapsed time in milliseconds.
+        throughput: Requests per second for this feature, computed as count
+            divided by the feature's own active time window (max − min timestamp
+            of that feature's samples, in seconds). 0.0 when the feature has
+            only one sample or all samples share the same timestamp.
         error_rate: Fraction of failed requests, in the range [0.0, 1.0].
     """
 
     name: str
     count: int
     mean_ms: float
-    min_ms: float
+    p50_ms: float
+    p90_ms: float
+    p95_ms: float
+    p99_ms: float
+    std_ms: float
     max_ms: float
+    throughput: float
     error_rate: float
 
 
@@ -74,8 +88,15 @@ class StatsReport:
         dataset_metadata: Source metadata, making this report self-contained.
         total_count: Total number of samples across all features.
         global_mean_ms: Mean elapsed time across all samples (ms).
-        global_min_ms: Minimum elapsed time across all samples (ms).
+        global_p50_ms: Median (50th percentile) elapsed time across all samples (ms).
+        global_p90_ms: 90th percentile elapsed time across all samples (ms).
+        global_p95_ms: 95th percentile elapsed time across all samples (ms).
+        global_p99_ms: 99th percentile elapsed time across all samples (ms).
+        global_std_ms: Standard deviation of elapsed time across all samples (ms,
+            ddof=1). 0.0 when total_count is 1.
         global_max_ms: Maximum elapsed time across all samples (ms).
+        global_throughput: Requests per second across all samples. 0.0 if
+            duration is zero or negative.
         global_error_rate: Fraction of failed requests globally, in [0.0, 1.0].
         per_feature: Per-feature breakdown, one entry per unique label.
     """
@@ -83,8 +104,13 @@ class StatsReport:
     dataset_metadata: DatasetMetadata
     total_count: int
     global_mean_ms: float
-    global_min_ms: float
+    global_p50_ms: float
+    global_p90_ms: float
+    global_p95_ms: float
+    global_p99_ms: float
+    global_std_ms: float
     global_max_ms: float
+    global_throughput: float
     global_error_rate: float
     per_feature: tuple[FeatureStats, ...]
 
