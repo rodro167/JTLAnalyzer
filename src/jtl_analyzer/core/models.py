@@ -1,5 +1,6 @@
 """Core data models: dataset containers, statistical reports, and orchestration plan structures."""
 
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -113,6 +114,51 @@ class StatsReport:
     global_throughput: float
     global_error_rate: float
     per_feature: tuple[FeatureStats, ...]
+
+
+@dataclass(frozen=True)
+class ResponseCodeBreakdown:
+    """A single response code's frequency within a feature.
+
+    Attributes:
+        code: The response code as it appears in the JTL (string, since JMeter
+            also reports non-numeric codes like "Non HTTP response code: ...").
+        count: Number of samples with this code for the feature.
+        percentage: Fraction of the feature's total samples with this code,
+            in the range [0.0, 1.0].
+    """
+
+    code: str
+    count: int
+    percentage: float
+
+
+@dataclass(frozen=True)
+class ErrorsReport:
+    """Per-feature response code distribution produced by the errors agent.
+
+    Attributes:
+        dataset_metadata: Source metadata, making this report self-contained.
+        codes_by_feature: Mapping from feature label to the tuple of response
+            code breakdowns for that feature. Each tuple is sorted by count
+            descending (most frequent code first).
+    """
+
+    dataset_metadata: DatasetMetadata
+    codes_by_feature: dict[str, tuple[ResponseCodeBreakdown, ...]]
+
+
+@dataclass(frozen=True)
+class AnalysisResult:
+    """Combined output of a full JTL analysis pipeline.
+
+    Attributes:
+        stats: Performance metrics produced by the statistician agent.
+        errors: Per-feature response code distribution produced by the errors agent.
+    """
+
+    stats: StatsReport
+    errors: ErrorsReport
 
 
 class PlanStep(BaseModel):

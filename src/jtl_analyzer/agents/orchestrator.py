@@ -6,10 +6,18 @@ from typing import Any, Callable, cast
 
 from pydantic import ValidationError
 
+from jtl_analyzer.agents import errors as errors_module
 from jtl_analyzer.agents import loader as loader_module
 from jtl_analyzer.agents import statistician as statistician_module
 from jtl_analyzer.core.exceptions import PlanValidationError, ProviderError
-from jtl_analyzer.core.models import NormalizedDataset, Plan, PlanStep, StatsReport
+from jtl_analyzer.core.models import (
+    AnalysisResult,
+    ErrorsReport,
+    NormalizedDataset,
+    Plan,
+    PlanStep,
+    StatsReport,
+)
 from jtl_analyzer.providers.base import LLMProvider, Message
 
 logger = logging.getLogger(__name__)
@@ -31,6 +39,11 @@ def _run_statistician(params: dict[str, Any], inputs: dict[str, Any]) -> StatsRe
     return statistician_module.run(dataset)
 
 
+def _run_errors(params: dict[str, Any], inputs: dict[str, Any]) -> ErrorsReport:
+    dataset: NormalizedDataset = next(iter(inputs.values()))
+    return errors_module.run(dataset)
+
+
 # ---------------------------------------------------------------------------
 # Default registry and registration API.
 #
@@ -45,6 +58,7 @@ def _run_statistician(params: dict[str, Any], inputs: dict[str, Any]) -> StatsRe
 DEFAULT_REGISTRY: dict[str, AgentFn] = {
     "loader": _run_loader,
     "statistician": _run_statistician,
+    "errors": _run_errors,
 }
 
 
@@ -89,23 +103,49 @@ class Orchestrator:
             registry if registry is not None else dict(DEFAULT_REGISTRY)
         )
 
-    def analyze(self, file_path: str) -> StatsReport:
-        """Analyze a JTL file end-to-end and return a StatsReport.
+    def analyze(self, file_path: str) -> AnalysisResult:
+        """Analyze a JTL file end-to-end and return a combined AnalysisResult.
 
         Args:
             file_path: Path to the JTL file to analyze.
 
         Returns:
-            The ``StatsReport`` produced by the final agent in the plan.
+            An ``AnalysisResult`` containing both the ``StatsReport`` from the
+            statistician agent and the ``ErrorsReport`` from the errors agent.
 
         Raises:
             ProviderError: If the LLM call fails or returns non-JSON output.
-            PlanValidationError: If the plan references an unknown agent,
-                a missing ``step_id``, or contains a dependency cycle.
+            PlanValidationError: If the plan references an unknown agent, a
+                missing ``step_id``, contains a dependency cycle, or omits the
+                statistician or errors agent (both are required for Milestone 1).
         """
         plan = self._generate_plan(file_path)
         self._validate_plan(plan)
-        return cast(StatsReport, self._execute_plan(plan))
+        results = self._execute_plan(plan)
+
+        stats: StatsReport | None = None
+        errors: ErrorsReport | None = None
+        for step in plan.steps:
+            if step.agent == "statistician":
+                stats = cast(StatsReport, results[step.step_id])
+            elif step.agent == "errors":
+                errors = cast(ErrorsReport, results[step.step_id])
+
+        missing = [
+            name
+            for name, val in [("statistician", stats), ("errors", errors)]
+            if val is None
+        ]
+        if missing:
+            raise PlanValidationError(
+                f"Plan is missing required agent(s): {', '.join(missing)}. "
+                "A full analysis requires loader, statistician, and errors steps."
+            )
+
+        return AnalysisResult(
+            stats=cast(StatsReport, stats),
+            errors=cast(ErrorsReport, errors),
+        )
 
     # ------------------------------------------------------------------
     # Internal methods
@@ -140,8 +180,12 @@ class Orchestrator:
                     f"Available agents:\n{agents_list}\n\n"
                     "Agent contracts:\n"
                     '- loader: loads a JTL file. Required params: {"file_path": "<path>"}\n'
-                    "- statistician: computes statistics from the loaded dataset. "
-                    "Depends on: loader.\n\n"
+                    "- statistician: computes performance statistics (mean, percentiles, "
+                    "throughput) from the loaded dataset. Depends on: loader.\n"
+                    "- errors: computes per-feature response code distribution from the loaded "
+                    "dataset. Depends on: loader. Independent of statistician.\n\n"
+                    "A full analysis requires all three agents. "
+                    "statistician and errors both depend on loader and run independently.\n\n"
                     f"Respond with a JSON plan matching this schema:\n{schema}\n"
                     "Output valid JSON only."
                 ),
@@ -167,14 +211,14 @@ class Orchestrator:
                     )
         _topological_sort(plan.steps)  # raises PlanValidationError if cyclic
 
-    def _execute_plan(self, plan: Plan) -> Any:
+    def _execute_plan(self, plan: Plan) -> dict[str, Any]:
         ordered = _topological_sort(plan.steps)
         results: dict[str, Any] = {}
         for step in ordered:
             inputs = {dep: results[dep] for dep in step.depends_on}
             logger.debug("Executing step '%s' via agent '%s'", step.step_id, step.agent)
             results[step.step_id] = self._registry[step.agent](step.params, inputs)
-        return results[ordered[-1].step_id]
+        return results
 
 
 # ---------------------------------------------------------------------------

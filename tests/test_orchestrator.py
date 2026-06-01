@@ -8,7 +8,7 @@ import pytest
 
 from jtl_analyzer.agents.orchestrator import Orchestrator
 from jtl_analyzer.core.exceptions import PlanValidationError
-from jtl_analyzer.core.models import StatsReport
+from jtl_analyzer.core.models import AnalysisResult, ErrorsReport, StatsReport
 from jtl_analyzer.providers.base import LLMProvider, LLMResponse
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -42,20 +42,36 @@ def _valid_plan(file_path: str) -> str:
                 "depends_on": ["load"],
                 "params": {},
             },
+            {
+                "step_id": "errors",
+                "agent": "errors",
+                "depends_on": ["load"],
+                "params": {},
+            },
         ]
     })
 
 
 class TestHappyPath:
-    def test_returns_stats_report(self):
+    def test_returns_analysis_result(self):
         orch = Orchestrator(_mock_provider(_valid_plan(CLEAN)))
         result = orch.analyze(CLEAN)
-        assert isinstance(result, StatsReport)
+        assert isinstance(result, AnalysisResult)
+
+    def test_result_contains_stats_report(self):
+        orch = Orchestrator(_mock_provider(_valid_plan(CLEAN)))
+        result = orch.analyze(CLEAN)
+        assert isinstance(result.stats, StatsReport)
+
+    def test_result_contains_errors_report(self):
+        orch = Orchestrator(_mock_provider(_valid_plan(CLEAN)))
+        result = orch.analyze(CLEAN)
+        assert isinstance(result.errors, ErrorsReport)
 
     def test_stats_report_has_correct_count(self):
         orch = Orchestrator(_mock_provider(_valid_plan(CLEAN)))
         result = orch.analyze(CLEAN)
-        assert result.total_count == 6
+        assert result.stats.total_count == 6
 
     def test_provider_called_exactly_once(self):
         provider = _mock_provider(_valid_plan(CLEAN))
@@ -123,6 +139,28 @@ class TestPlanValidation:
         bad = json.dumps({"not_steps": []})
         with pytest.raises(PlanValidationError):
             Orchestrator(_mock_provider(bad)).analyze(CLEAN)
+
+
+class TestMissingAgent:
+    def test_plan_without_errors_step_raises(self):
+        plan_no_errors = json.dumps({
+            "steps": [
+                {"step_id": "load", "agent": "loader", "depends_on": [], "params": {"file_path": CLEAN}},
+                {"step_id": "analyze", "agent": "statistician", "depends_on": ["load"], "params": {}},
+            ]
+        })
+        with pytest.raises(PlanValidationError, match="errors"):
+            Orchestrator(_mock_provider(plan_no_errors)).analyze(CLEAN)
+
+    def test_plan_without_statistician_step_raises(self):
+        plan_no_stats = json.dumps({
+            "steps": [
+                {"step_id": "load", "agent": "loader", "depends_on": [], "params": {"file_path": CLEAN}},
+                {"step_id": "errors", "agent": "errors", "depends_on": ["load"], "params": {}},
+            ]
+        })
+        with pytest.raises(PlanValidationError, match="statistician"):
+            Orchestrator(_mock_provider(plan_no_stats)).analyze(CLEAN)
 
 
 class TestRegistry:

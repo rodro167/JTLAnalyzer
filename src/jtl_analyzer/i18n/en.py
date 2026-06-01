@@ -40,3 +40,5 @@ REPORT_FEATURE_ROW = (
     "  {name:<30}  {count:>5}  {mean:>7.1f}ms  {p90:>7.1f}ms"
     "  {p95:>7.1f}ms  {max:>7.1f}ms  {throughput:>9.1f}  {rate:>6.1%}"
 )
+REPORT_RESPONSE_CODES_HEADER = "    Response codes:"
+REPORT_RESPONSE_CODE_ROW = "      {code}: {percentage:.1%} ({count})"

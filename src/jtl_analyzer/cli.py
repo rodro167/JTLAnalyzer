@@ -5,12 +5,13 @@ import sys
 
 from jtl_analyzer.agents.orchestrator import Orchestrator
 from jtl_analyzer.config import load_config
-from jtl_analyzer.core.models import StatsReport
+from jtl_analyzer.core.models import AnalysisResult
 from jtl_analyzer.i18n import get_message
 from jtl_analyzer.providers.factory import create_provider
 
 
-def _print_report(report: StatsReport, lang: str) -> None:
+def _print_report(result: AnalysisResult, lang: str) -> None:
+    report = result.stats
     print(get_message("REPORT_HEADER", lang))
     print(get_message("REPORT_FILE", lang, file_path=report.dataset_metadata.file_path))
     print(get_message("REPORT_DURATION", lang, duration=report.dataset_metadata.duration_seconds))
@@ -38,6 +39,19 @@ def _print_report(report: StatsReport, lang: str) -> None:
                 rate=fs.error_rate,
             )
         )
+        breakdowns = result.errors.codes_by_feature.get(fs.name, ())
+        if breakdowns:
+            print(get_message("REPORT_RESPONSE_CODES_HEADER", lang))
+            for bd in breakdowns:
+                print(
+                    get_message(
+                        "REPORT_RESPONSE_CODE_ROW",
+                        lang,
+                        code=bd.code,
+                        percentage=bd.percentage,
+                        count=bd.count,
+                    )
+                )
 
 
 def main() -> None:
@@ -56,8 +70,8 @@ def main() -> None:
             provider = create_provider(config.llm_provider, config.api_key, config.llm_model)
             orchestrator = Orchestrator(provider)
             print(get_message("ANALYZING_FILE", config.output_language, file_path=args.file))
-            report = orchestrator.analyze(args.file)
-            _print_report(report, config.output_language)
+            result = orchestrator.analyze(args.file)
+            _print_report(result, config.output_language)
         except Exception as exc:
             print(f"Error: {exc}", file=sys.stderr)
             sys.exit(1)
