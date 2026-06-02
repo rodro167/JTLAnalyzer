@@ -6,12 +6,14 @@ from typing import Any, Callable, cast
 
 from pydantic import ValidationError
 
+from jtl_analyzer.agents import anomalies as anomalies_module
 from jtl_analyzer.agents import errors as errors_module
 from jtl_analyzer.agents import loader as loader_module
 from jtl_analyzer.agents import statistician as statistician_module
 from jtl_analyzer.core.exceptions import PlanValidationError, ProviderError
 from jtl_analyzer.core.models import (
     AnalysisResult,
+    AnomaliesReport,
     ErrorsReport,
     NormalizedDataset,
     Plan,
@@ -44,6 +46,11 @@ def _run_errors(params: dict[str, Any], inputs: dict[str, Any]) -> ErrorsReport:
     return errors_module.run(dataset)
 
 
+def _run_anomalies(params: dict[str, Any], inputs: dict[str, Any]) -> AnomaliesReport:
+    dataset: NormalizedDataset = next(iter(inputs.values()))
+    return anomalies_module.run(dataset)
+
+
 # ---------------------------------------------------------------------------
 # Default registry and registration API.
 #
@@ -59,6 +66,7 @@ DEFAULT_REGISTRY: dict[str, AgentFn] = {
     "loader": _run_loader,
     "statistician": _run_statistician,
     "errors": _run_errors,
+    "anomalies": _run_anomalies,
 }
 
 
@@ -110,14 +118,14 @@ class Orchestrator:
             file_path: Path to the JTL file to analyze.
 
         Returns:
-            An ``AnalysisResult`` containing both the ``StatsReport`` from the
-            statistician agent and the ``ErrorsReport`` from the errors agent.
+            An ``AnalysisResult`` containing the ``StatsReport``, ``ErrorsReport``,
+            and ``AnomaliesReport`` from their respective agents.
 
         Raises:
             ProviderError: If the LLM call fails or returns non-JSON output.
             PlanValidationError: If the plan references an unknown agent, a
-                missing ``step_id``, contains a dependency cycle, or omits the
-                statistician or errors agent (both are required for Milestone 1).
+                missing ``step_id``, contains a dependency cycle, or omits any
+                of the three required agents (statistician, errors, anomalies).
         """
         plan = self._generate_plan(file_path)
         self._validate_plan(plan)
@@ -125,26 +133,30 @@ class Orchestrator:
 
         stats: StatsReport | None = None
         errors: ErrorsReport | None = None
+        anomalies: AnomaliesReport | None = None
         for step in plan.steps:
             if step.agent == "statistician":
                 stats = cast(StatsReport, results[step.step_id])
             elif step.agent == "errors":
                 errors = cast(ErrorsReport, results[step.step_id])
+            elif step.agent == "anomalies":
+                anomalies = cast(AnomaliesReport, results[step.step_id])
 
         missing = [
             name
-            for name, val in [("statistician", stats), ("errors", errors)]
+            for name, val in [("statistician", stats), ("errors", errors), ("anomalies", anomalies)]
             if val is None
         ]
         if missing:
             raise PlanValidationError(
                 f"Plan is missing required agent(s): {', '.join(missing)}. "
-                "A full analysis requires loader, statistician, and errors steps."
+                "A full analysis requires loader, statistician, errors, and anomalies steps."
             )
 
         return AnalysisResult(
             stats=cast(StatsReport, stats),
             errors=cast(ErrorsReport, errors),
+            anomalies=cast(AnomaliesReport, anomalies),
         )
 
     # ------------------------------------------------------------------
@@ -183,9 +195,11 @@ class Orchestrator:
                     "- statistician: computes performance statistics (mean, percentiles, "
                     "throughput) from the loaded dataset. Depends on: loader.\n"
                     "- errors: computes per-feature response code distribution from the loaded "
-                    "dataset. Depends on: loader. Independent of statistician.\n\n"
-                    "A full analysis requires all three agents. "
-                    "statistician and errors both depend on loader and run independently.\n\n"
+                    "dataset. Depends on: loader. Independent of statistician.\n"
+                    "- anomalies: detects upper-tail response-time outliers per feature using "
+                    "the IQR method. Depends on: loader. Independent of statistician and errors.\n\n"
+                    "A full analysis requires all four agents. "
+                    "statistician, errors, and anomalies all depend on loader and run independently.\n\n"
                     f"Respond with a JSON plan matching this schema:\n{schema}\n"
                     "Output valid JSON only."
                 ),

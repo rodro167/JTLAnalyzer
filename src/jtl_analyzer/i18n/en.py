@@ -42,3 +42,8 @@ REPORT_FEATURE_ROW = (
 )
 REPORT_RESPONSE_CODES_HEADER = "    Response codes:"
 REPORT_RESPONSE_CODE_ROW = "      {code}: {percentage:.1%} ({count})"
+REPORT_ANOMALIES_HEADER = "    Anomalies ({count} detected, threshold {threshold:.1f}ms):"
+REPORT_ANOMALY_ROW = "      {timestamp} - {elapsed:.1f}ms ({factor:.1f}x over threshold) [{code}]"
+REPORT_ANOMALIES_MORE = "      [{count} more]"
+REPORT_ANOMALIES_NONE = "    Anomalies: none detected (threshold {threshold:.1f}ms)"
+REPORT_ANOMALIES_INSUFFICIENT = "    Anomalies: insufficient data (< 20 samples)"

@@ -149,16 +149,77 @@ class ErrorsReport:
 
 
 @dataclass(frozen=True)
+class AnomalousSample:
+    """A single sample identified as anomalous within its feature.
+
+    Attributes:
+        timestamp: When the sample occurred.
+        elapsed_ms: Response time in milliseconds.
+        feature: The feature label this sample belongs to.
+        response_code: HTTP code or non-HTTP code string from the JTL.
+        deviation_factor: How many times the sample's elapsed exceeds the
+            feature's upper IQR threshold. Computed as elapsed_ms / threshold_ms.
+            A value of 3.0 means the sample is 3x the threshold.
+    """
+
+    timestamp: datetime
+    elapsed_ms: float
+    feature: str
+    response_code: str
+    deviation_factor: float
+
+
+@dataclass(frozen=True)
+class FeatureAnomalies:
+    """All anomalies detected for one feature, with context.
+
+    Attributes:
+        feature: The feature label.
+        total_samples: Total samples of this feature in the dataset.
+        anomaly_count: Number of samples flagged as anomalous.
+        anomaly_rate: anomaly_count / total_samples, in [0.0, 1.0].
+        threshold_ms: The IQR upper bound used (Q3 + 1.5 * IQR), in milliseconds.
+            Set to 0.0 when detection was skipped (insufficient_data=True).
+        samples: Tuple of anomalous samples, sorted by deviation_factor descending.
+        insufficient_data: True if the feature had fewer than MIN_SAMPLES_FOR_DETECTION
+            samples, or if IQR == 0 (degenerate distribution), and detection was skipped.
+    """
+
+    feature: str
+    total_samples: int
+    anomaly_count: int
+    anomaly_rate: float
+    threshold_ms: float
+    samples: tuple[AnomalousSample, ...]
+    insufficient_data: bool
+
+
+@dataclass(frozen=True)
+class AnomaliesReport:
+    """Per-feature anomaly detection results produced by the anomalies agent.
+
+    Attributes:
+        dataset_metadata: Source metadata, making this report self-contained.
+        by_feature: Mapping from feature label to its detection results.
+    """
+
+    dataset_metadata: DatasetMetadata
+    by_feature: dict[str, FeatureAnomalies]
+
+
+@dataclass(frozen=True)
 class AnalysisResult:
     """Combined output of a full JTL analysis pipeline.
 
     Attributes:
         stats: Performance metrics produced by the statistician agent.
         errors: Per-feature response code distribution produced by the errors agent.
+        anomalies: Per-feature anomaly detection produced by the anomalies agent.
     """
 
     stats: StatsReport
     errors: ErrorsReport
+    anomalies: AnomaliesReport
 
 
 class PlanStep(BaseModel):

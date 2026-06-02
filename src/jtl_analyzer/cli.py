@@ -52,6 +52,29 @@ def _print_report(result: AnalysisResult, lang: str) -> None:
                         count=bd.count,
                     )
                 )
+        fa = result.anomalies.by_feature.get(fs.name)
+        if fa is not None:
+            if fa.insufficient_data:
+                print(get_message("REPORT_ANOMALIES_INSUFFICIENT", lang))
+            elif fa.anomaly_count == 0:
+                print(get_message("REPORT_ANOMALIES_NONE", lang, threshold=fa.threshold_ms))
+            else:
+                print(get_message("REPORT_ANOMALIES_HEADER", lang, count=fa.anomaly_count, threshold=fa.threshold_ms))
+                shown = fa.samples[:5]
+                for sample in shown:
+                    print(
+                        get_message(
+                            "REPORT_ANOMALY_ROW",
+                            lang,
+                            timestamp=sample.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                            elapsed=sample.elapsed_ms,
+                            factor=sample.deviation_factor,
+                            code=sample.response_code,
+                        )
+                    )
+                remaining = len(fa.samples) - len(shown)
+                if remaining > 0:
+                    print(get_message("REPORT_ANOMALIES_MORE", lang, count=remaining))
 
 
 def main() -> None:

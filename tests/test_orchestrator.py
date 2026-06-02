@@ -8,7 +8,7 @@ import pytest
 
 from jtl_analyzer.agents.orchestrator import Orchestrator
 from jtl_analyzer.core.exceptions import PlanValidationError
-from jtl_analyzer.core.models import AnalysisResult, ErrorsReport, StatsReport
+from jtl_analyzer.core.models import AnalysisResult, AnomaliesReport, ErrorsReport, StatsReport
 from jtl_analyzer.providers.base import LLMProvider, LLMResponse
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -48,6 +48,12 @@ def _valid_plan(file_path: str) -> str:
                 "depends_on": ["load"],
                 "params": {},
             },
+            {
+                "step_id": "anomalies",
+                "agent": "anomalies",
+                "depends_on": ["load"],
+                "params": {},
+            },
         ]
     })
 
@@ -67,6 +73,11 @@ class TestHappyPath:
         orch = Orchestrator(_mock_provider(_valid_plan(CLEAN)))
         result = orch.analyze(CLEAN)
         assert isinstance(result.errors, ErrorsReport)
+
+    def test_result_contains_anomalies_report(self):
+        orch = Orchestrator(_mock_provider(_valid_plan(CLEAN)))
+        result = orch.analyze(CLEAN)
+        assert isinstance(result.anomalies, AnomaliesReport)
 
     def test_stats_report_has_correct_count(self):
         orch = Orchestrator(_mock_provider(_valid_plan(CLEAN)))
@@ -161,6 +172,17 @@ class TestMissingAgent:
         })
         with pytest.raises(PlanValidationError, match="statistician"):
             Orchestrator(_mock_provider(plan_no_stats)).analyze(CLEAN)
+
+    def test_plan_without_anomalies_step_raises(self):
+        plan_no_anomalies = json.dumps({
+            "steps": [
+                {"step_id": "load", "agent": "loader", "depends_on": [], "params": {"file_path": CLEAN}},
+                {"step_id": "analyze", "agent": "statistician", "depends_on": ["load"], "params": {}},
+                {"step_id": "errors", "agent": "errors", "depends_on": ["load"], "params": {}},
+            ]
+        })
+        with pytest.raises(PlanValidationError, match="anomalies"):
+            Orchestrator(_mock_provider(plan_no_anomalies)).analyze(CLEAN)
 
 
 class TestRegistry:
