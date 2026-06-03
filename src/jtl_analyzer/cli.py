@@ -75,6 +75,34 @@ def _print_report(result: AnalysisResult, lang: str) -> None:
                 remaining = len(fa.samples) - len(shown)
                 if remaining > 0:
                     print(get_message("REPORT_ANOMALIES_MORE", lang, count=remaining))
+        ft = result.trends.by_feature.get(fs.name)
+        if ft is not None:
+            if ft.insufficient_data:
+                print(get_message("REPORT_TRENDS_INSUFFICIENT", lang))
+            elif not ft.windows:
+                print(get_message("REPORT_TRENDS_NONE", lang))
+            else:
+                ref = ft.windows[0].reference_median_ms
+                print(
+                    get_message(
+                        "REPORT_TRENDS_HEADER",
+                        lang,
+                        count=len(ft.windows),
+                        reference=ref,
+                    )
+                )
+                for w in ft.windows:
+                    print(
+                        get_message(
+                            "REPORT_TREND_WINDOW_ROW",
+                            lang,
+                            start=w.start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                            end=w.end_time.strftime("%H:%M:%S"),
+                            duration=w.duration_seconds / 60,
+                            median=w.window_median_ms,
+                            factor=w.degradation_factor,
+                        )
+                    )
 
 
 def main() -> None:
@@ -84,6 +112,12 @@ def main() -> None:
 
     analyze_cmd = sub.add_parser("analyze", help="Analyze a JTL file")
     analyze_cmd.add_argument("file", help="Path to the JTL file")
+    analyze_cmd.add_argument(
+        "--warmup",
+        type=float,
+        default=0.0,
+        help="Seconds to exclude from the start of the test (default: 0)",
+    )
 
     args = parser.parse_args()
 
@@ -93,7 +127,7 @@ def main() -> None:
             provider = create_provider(config.llm_provider, config.api_key, config.llm_model)
             orchestrator = Orchestrator(provider)
             print(get_message("ANALYZING_FILE", config.output_language, file_path=args.file))
-            result = orchestrator.analyze(args.file)
+            result = orchestrator.analyze(args.file, warmup_seconds=args.warmup)
             _print_report(result, config.output_language)
         except Exception as exc:
             print(f"Error: {exc}", file=sys.stderr)

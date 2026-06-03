@@ -93,7 +93,7 @@ def _parse_xml(file_path: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def run(file_path: str) -> NormalizedDataset:
+def run(file_path: str, warmup_seconds: float = 0.0) -> NormalizedDataset:
     """Load and normalize a CSV-format or XML-format JTL file.
 
     Detects the file format from its first bytes. For CSV files, expects the
@@ -102,17 +102,23 @@ def run(file_path: str) -> NormalizedDataset:
 
     Renames ``timeStamp`` to ``timestamp``, converts elapsed to float,
     parses success as bool, and converts the timestamp column to UTC datetimes.
+    When ``warmup_seconds`` is greater than zero, all samples whose timestamp
+    falls within the first ``warmup_seconds`` from the earliest timestamp in
+    the raw dataset are excluded before returning.
 
     Args:
         file_path: Path to the JTL file (CSV or XML format).
+        warmup_seconds: Seconds to exclude from the start of the dataset.
+            Defaults to 0.0 (no exclusion).
 
     Returns:
         A ``NormalizedDataset`` with cleaned data and descriptive metadata.
 
     Raises:
-        InvalidJTLError: If the file is missing, unreadable, malformed, or
-            lacks any of the required columns (``timestamp``, ``elapsed``,
-            ``label``, ``success``).
+        InvalidJTLError: If the file is missing, unreadable, malformed, lacks
+            any of the required columns (``timestamp``, ``elapsed``, ``label``,
+            ``success``), or if ``warmup_seconds`` is large enough to exclude
+            all samples.
     """
     if not os.path.exists(file_path):
         raise InvalidJTLError(get_message("ERROR_FILE_NOT_FOUND", file_path=file_path))
@@ -134,6 +140,20 @@ def run(file_path: str) -> NormalizedDataset:
         df["success"].astype(str).str.lower().map({"true": True, "false": False}).fillna(False)
     )
 
+    original_row_count = len(df)
+
+    if warmup_seconds > 0.0:
+        cutoff = df["timestamp"].min() + pd.Timedelta(seconds=warmup_seconds)
+        df = df[df["timestamp"] >= cutoff]
+        if df.empty:
+            raise InvalidJTLError(
+                get_message(
+                    "ERROR_WARMUP_EXCLUDES_ALL",
+                    seconds=warmup_seconds,
+                    file_path=file_path,
+                )
+            )
+
     start_time = df["timestamp"].min().to_pydatetime()
     end_time = df["timestamp"].max().to_pydatetime()
 
@@ -143,6 +163,8 @@ def run(file_path: str) -> NormalizedDataset:
         start_time=start_time,
         end_time=end_time,
         duration_seconds=(end_time - start_time).total_seconds(),
+        warmup_seconds=warmup_seconds,
+        original_row_count=original_row_count,
     )
 
     logger.debug("Loaded %d rows from %s", len(df), file_path)

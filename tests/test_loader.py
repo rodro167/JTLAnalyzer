@@ -164,6 +164,41 @@ class TestXMLTruncation:
         assert any("truncated" in r.message.lower() for r in caplog.records)
 
 
+class TestWarmup:
+    def _make_csv(self, tmp_path, duration_seconds: int, count: int) -> "Path":
+        """CSV with ``count`` samples evenly spread over ``duration_seconds``."""
+        base_ts = 1_700_000_000_000  # ms
+        interval_ms = (duration_seconds * 1000) // (count - 1) if count > 1 else 1000
+        header = "timeStamp,elapsed,label,success,responseCode"
+        rows = [f"{base_ts + i * interval_ms},100,Feature,true,200" for i in range(count)]
+        f = tmp_path / "warmup.jtl"
+        f.write_text(header + "\n" + "\n".join(rows))
+        return f
+
+    def test_warmup_excludes_initial_samples(self, tmp_path):
+        # 11 samples at t=0,1,...,10s; warmup=5s keeps t>=5s → 6 samples
+        f = self._make_csv(tmp_path, duration_seconds=10, count=11)
+        ds = loader.run(str(f), warmup_seconds=5)
+        assert ds.metadata.row_count == 6
+
+    def test_warmup_zero_keeps_everything(self, tmp_path):
+        f = self._make_csv(tmp_path, duration_seconds=10, count=11)
+        ds = loader.run(str(f), warmup_seconds=0.0)
+        assert ds.metadata.row_count == 11
+
+    def test_warmup_exceeds_dataset_raises(self, tmp_path):
+        f = self._make_csv(tmp_path, duration_seconds=10, count=11)
+        with pytest.raises(InvalidJTLError, match="excluded all samples"):
+            loader.run(str(f), warmup_seconds=100)
+
+    def test_warmup_metadata_reflects_applied_warmup(self, tmp_path):
+        f = self._make_csv(tmp_path, duration_seconds=10, count=11)
+        ds = loader.run(str(f), warmup_seconds=5)
+        assert ds.metadata.warmup_seconds == 5.0
+        assert ds.metadata.original_row_count == 11
+        assert ds.metadata.original_row_count > ds.metadata.row_count
+
+
 _LARGE_XML_FIXTURE = FIXTURES / "large_xml_real.jtl"
 
 

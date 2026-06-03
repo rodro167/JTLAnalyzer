@@ -15,10 +15,15 @@ class DatasetMetadata:
 
     Attributes:
         file_path: Absolute path to the source JTL file.
-        row_count: Number of samples after loading and normalization.
-        start_time: Earliest timestamp in the dataset.
-        end_time: Latest timestamp in the dataset.
+        row_count: Number of samples after loading, normalization, and warmup
+            filtering.
+        start_time: Earliest timestamp in the (post-warmup) dataset.
+        end_time: Latest timestamp in the (post-warmup) dataset.
         duration_seconds: Wall-clock duration of the test run in seconds.
+        warmup_seconds: Duration in seconds excluded from the start of the
+            dataset. 0.0 when no warmup filtering was applied.
+        original_row_count: Number of samples before warmup filtering. Equals
+            row_count when warmup_seconds is 0.0.
     """
 
     file_path: str
@@ -26,6 +31,8 @@ class DatasetMetadata:
     start_time: datetime
     end_time: datetime
     duration_seconds: float
+    warmup_seconds: float = 0.0
+    original_row_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -208,6 +215,61 @@ class AnomaliesReport:
 
 
 @dataclass(frozen=True)
+class DegradationWindow:
+    """A contiguous time window where a feature's response times degraded.
+
+    Attributes:
+        start_time: Start of the degraded window (timestamp of first degraded bin).
+        end_time: End of the degraded window (timestamp of last degraded bin's
+            end, i.e. last bin start + BIN_SIZE_SECONDS).
+        duration_seconds: Length of the window in seconds.
+        window_median_ms: Median elapsed within the window.
+        reference_median_ms: Median elapsed for the feature outside any degraded
+            window (the "normal" baseline, computed as median of per-bin medians).
+        degradation_factor: window_median_ms / reference_median_ms.
+    """
+
+    start_time: datetime
+    end_time: datetime
+    duration_seconds: float
+    window_median_ms: float
+    reference_median_ms: float
+    degradation_factor: float
+
+
+@dataclass(frozen=True)
+class FeatureTrends:
+    """Temporal trend analysis for one feature.
+
+    Attributes:
+        feature: The feature label.
+        total_samples: Total samples of this feature in the (post-warmup) dataset.
+        windows: All detected degradation windows, sorted chronologically.
+        insufficient_data: True if the feature has fewer than 20 samples, if
+            it has no non-empty 1-minute bins, or if the reference median is 0
+            (degenerate distribution). Detection was skipped in all these cases.
+    """
+
+    feature: str
+    total_samples: int
+    windows: tuple[DegradationWindow, ...]
+    insufficient_data: bool
+
+
+@dataclass(frozen=True)
+class TrendsReport:
+    """Per-feature temporal trend analysis produced by the trends agent.
+
+    Attributes:
+        dataset_metadata: Source metadata, making this report self-contained.
+        by_feature: Mapping from feature label to its trend analysis.
+    """
+
+    dataset_metadata: DatasetMetadata
+    by_feature: dict[str, FeatureTrends]
+
+
+@dataclass(frozen=True)
 class AnalysisResult:
     """Combined output of a full JTL analysis pipeline.
 
@@ -215,11 +277,14 @@ class AnalysisResult:
         stats: Performance metrics produced by the statistician agent.
         errors: Per-feature response code distribution produced by the errors agent.
         anomalies: Per-feature anomaly detection produced by the anomalies agent.
+        trends: Per-feature temporal degradation analysis produced by the trends
+            agent.
     """
 
     stats: StatsReport
     errors: ErrorsReport
     anomalies: AnomaliesReport
+    trends: TrendsReport
 
 
 class PlanStep(BaseModel):

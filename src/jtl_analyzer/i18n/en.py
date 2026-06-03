@@ -18,6 +18,7 @@ ERROR_MISSING_API_KEY = (
 ERROR_MALFORMED_XML = "Could not parse XML in '{file_path}': {reason}"
 ERROR_EMPTY_DATASET = "No sample elements found in '{file_path}'"
 WARNING_TRUNCATED_FILE = "File appears truncated; recovered {count} samples from '{file_path}'"
+ERROR_WARMUP_EXCLUDES_ALL = "Warmup of {seconds:.1f}s excluded all samples from '{file_path}'"
 
 # Report labels
 REPORT_HEADER = "=== JTL Analysis Report ==="
@@ -47,3 +48,7 @@ REPORT_ANOMALY_ROW = "      {timestamp} - {elapsed:.1f}ms ({factor:.1f}x over th
 REPORT_ANOMALIES_MORE = "      [{count} more]"
 REPORT_ANOMALIES_NONE = "    Anomalies: none detected (threshold {threshold:.1f}ms)"
 REPORT_ANOMALIES_INSUFFICIENT = "    Anomalies: insufficient data (< 20 samples)"
+REPORT_TRENDS_HEADER = "    Degradation windows ({count} detected, reference {reference:.1f}ms):"
+REPORT_TREND_WINDOW_ROW = "      {start} to {end} ({duration:.1f}min, median {median:.1f}ms, {factor:.1f}x reference)"
+REPORT_TRENDS_NONE = "    Degradation windows: none detected"
+REPORT_TRENDS_INSUFFICIENT = "    Degradation windows: insufficient data (< 20 samples)"
