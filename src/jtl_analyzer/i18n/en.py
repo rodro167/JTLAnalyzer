@@ -2,6 +2,7 @@
 
 # CLI
 ANALYZING_FILE = "Analyzing {file_path} ..."
+SERVING_API = "Starting JTL Analyzer API on http://{host}:{port} (docs at /docs)"
 
 # Errors shown to users
 ERROR_FILE_NOT_FOUND = "File not found: {file_path}"
@@ -14,6 +15,9 @@ ERROR_MISSING_API_KEY = (
     "API key for provider '{provider}' is not set. "
     "Add {var_name} to your .env file."
 )
+
+ERROR_FILE_TOO_LARGE = "Upload exceeds the maximum size of {max_mb:g} MB"
+ERROR_INTERNAL = "An unexpected error occurred"
 
 ERROR_MALFORMED_XML = "Could not parse XML in '{file_path}': {reason}"
 ERROR_EMPTY_DATASET = "No sample elements found in '{file_path}'"

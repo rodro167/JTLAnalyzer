@@ -30,3 +30,4 @@ samples/*
 .DS_Store
 
 tests/fixtures/2025_04_09WaterShuttlesFullMW1.jtl
+tmp_pytest/

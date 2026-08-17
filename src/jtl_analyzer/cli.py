@@ -4,7 +4,7 @@ import argparse
 import sys
 
 from jtl_analyzer.agents.orchestrator import Orchestrator
-from jtl_analyzer.config import load_config
+from jtl_analyzer.config import load_api_config, load_config
 from jtl_analyzer.core.models import AnalysisResult
 from jtl_analyzer.i18n import get_message
 from jtl_analyzer.providers.factory import create_provider
@@ -119,7 +119,29 @@ def main() -> None:
         help="Seconds to exclude from the start of the test (default: 0)",
     )
 
+    serve_cmd = sub.add_parser("serve", help="Start the REST API server")
+    serve_cmd.add_argument("--host", default=None, help="Bind address (default: API_HOST)")
+    serve_cmd.add_argument("--port", type=int, default=None, help="Port (default: API_PORT)")
+    serve_cmd.add_argument(
+        "--reload",
+        action="store_true",
+        help="Restart the server on source changes (development only)",
+    )
+
     args = parser.parse_args()
+
+    if args.command == "serve":
+        # Imported here so `analyze` does not require uvicorn to be installed.
+        import uvicorn
+
+        api_config = load_api_config()
+        host = args.host if args.host is not None else api_config.host
+        port = args.port if args.port is not None else api_config.port
+        # `serve` does not build a Config (the API needs no LLM credentials), so
+        # the catalog default applies. Only English exists as of Milestone 2.5.
+        print(get_message("SERVING_API", host=host, port=port))
+        uvicorn.run("jtl_analyzer.api.main:app", host=host, port=port, reload=args.reload)
+        return
 
     if args.command == "analyze":
         try:

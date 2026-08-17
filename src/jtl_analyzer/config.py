@@ -35,6 +35,62 @@ class Config:
     api_key: str
 
 
+@dataclass(frozen=True)
+class ApiConfig:
+    """Configuration for the REST API layer, derived from environment variables.
+
+    Deliberately separate from ``Config``: the API path calls the specialist
+    agents directly and never invokes an LLM, so it must not inherit
+    ``load_config()``'s requirement that a provider API key be present.
+
+    Attributes:
+        host: Interface the API server binds to.
+        port: TCP port the API server listens on.
+        max_upload_mb: Maximum accepted upload size in megabytes. Requests
+            exceeding it are rejected with HTTP 413.
+    """
+
+    host: str
+    port: int
+    max_upload_mb: float
+
+    @property
+    def max_upload_bytes(self) -> int:
+        """Return ``max_upload_mb`` expressed in bytes."""
+        return int(self.max_upload_mb * 1024 * 1024)
+
+
+def load_api_config() -> ApiConfig:
+    """Load REST API configuration from the environment.
+
+    Reads a ``.env`` file in the working directory via ``python-dotenv``.
+    Unlike ``load_config()``, this performs no provider or API-key validation,
+    because the API never calls an LLM.
+
+    Returns:
+        A frozen ``ApiConfig`` instance. Malformed ``API_PORT`` or
+        ``API_MAX_UPLOAD_MB`` values fall back to their defaults.
+    """
+    load_dotenv()
+
+    host = os.getenv("API_HOST", "0.0.0.0")
+
+    try:
+        port = int(os.getenv("API_PORT", "8000"))
+    except ValueError:
+        logger.warning("Invalid API_PORT value; falling back to 8000")
+        port = 8000
+
+    try:
+        max_upload_mb = float(os.getenv("API_MAX_UPLOAD_MB", "200"))
+    except ValueError:
+        logger.warning("Invalid API_MAX_UPLOAD_MB value; falling back to 200")
+        max_upload_mb = 200.0
+
+    logger.info("API config loaded: host=%s port=%d max_upload_mb=%s", host, port, max_upload_mb)
+    return ApiConfig(host=host, port=port, max_upload_mb=max_upload_mb)
+
+
 def load_config() -> Config:
     """Load and validate application configuration from the environment.
 
